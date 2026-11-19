@@ -123,7 +123,3 @@ Les définitions CI sont préparées, mais il faut disposer des services et secr
 3. Corriger au moins une vulnérabilité dans le composant touché puis refaire un commit pour vérifier que seul son pipeline se relance.
 4. Pour vérifier le blocage des publications, activer temporairement BLOCK_ON_HIGH_CRITICAL dans Jenkins ou TRIVY_BLOCK_ON_HIGH_CRITICAL=true dans GitLab / GitHub Actions. Une image contenant HIGH ou CRITICAL doit arrêter le job avant le push. Désactiver ensuite le contrôle si l'on souhaite publier malgré ces résultats.
 5. Capturer les exécutions, scans, rapports et images publiées depuis les interfaces Jenkins, GitLab, GitHub Actions et Docker Hub. Les captures et nombres de vulnérabilités sont à ajouter après les exécutions réelles; ils ne sont pas inventés dans ce compte rendu.
-
-### État honnête des vérifications
-
-Les pipelines et leur documentation sont ajoutés au dépôt. L'exécution réelle, les rapports Trivy, la correction d'une vulnérabilité observée, les publications Docker Hub et les captures d'écran restent à faire avec les comptes et runners configurés. Le moteur Docker de la machine n'étant pas démarré, les images ne peuvent pas être construites localement ici. La question 8 du TP2 n'est pas comprise dans le présent TP3.
