@@ -1,0 +1,54 @@
+image: docker:28.5.2-cli
+
+services:
+  - name: docker:28.5.2-dind
+    alias: docker
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+  TRIVY_IMAGE: aquasec/trivy:0.76.2
+  TRIVY_BLOCK_ON_HIGH_CRITICAL: "false"
+
+stages:
+  - build_push
+
+build_push_server:
+  stage: build_push
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+      changes:
+        - server/**/*
+        - .gitlab-ci.yml
+  script:
+    - test -n "$IMAGE_SERVER" || (echo "Set IMAGE_SERVER in GitLab CI/CD variables"; exit 1)
+    - docker build -t "$IMAGE_SERVER:$CI_COMMIT_SHORT_SHA" server
+    - docker save "$IMAGE_SERVER:$CI_COMMIT_SHORT_SHA" | docker run --rm -i "$TRIVY_IMAGE" image --input /dev/stdin --scanners vuln --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --format table > trivy_server.txt
+    - cat trivy_server.txt
+    - 'if [ "$TRIVY_BLOCK_ON_HIGH_CRITICAL" = "true" ]; then docker save "$IMAGE_SERVER:$CI_COMMIT_SHORT_SHA" | docker run --rm -i "$TRIVY_IMAGE" image --input /dev/stdin --scanners vuln --severity HIGH,CRITICAL --exit-code 1; fi'
+    - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
+    - docker push "$IMAGE_SERVER:$CI_COMMIT_SHORT_SHA"
+  artifacts:
+    when: always
+    paths:
+      - trivy_server.txt
+
+build_push_client:
+  stage: build_push
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+      changes:
+        - client/**/*
+        - .gitlab-ci.yml
+  script:
+    - test -n "$IMAGE_CLIENT" || (echo "Set IMAGE_CLIENT in GitLab CI/CD variables"; exit 1)
+    - docker build --build-arg REACT_APP_API_URL=http://localhost:9000 -t "$IMAGE_CLIENT:$CI_COMMIT_SHORT_SHA" client
+    - docker save "$IMAGE_CLIENT:$CI_COMMIT_SHORT_SHA" | docker run --rm -i "$TRIVY_IMAGE" image --input /dev/stdin --scanners vuln --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --format table > trivy_client.txt
+    - cat trivy_client.txt
+    - 'if [ "$TRIVY_BLOCK_ON_HIGH_CRITICAL" = "true" ]; then docker save "$IMAGE_CLIENT:$CI_COMMIT_SHORT_SHA" | docker run --rm -i "$TRIVY_IMAGE" image --input /dev/stdin --scanners vuln --severity HIGH,CRITICAL --exit-code 1; fi'
+    - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
+    - docker push "$IMAGE_CLIENT:$CI_COMMIT_SHORT_SHA"
+  artifacts:
+    when: always
+    paths:
+      - trivy_client.txt

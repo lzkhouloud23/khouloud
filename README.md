@@ -92,3 +92,38 @@ docker compose down
 ```
 
 Cette commande conserve le volume. `docker compose down -v` supprime également `mern-data` et les données MongoDB.
+
+## TP3 — CI Docker avec Jenkins, GitLab CI et GitHub Actions
+
+### Objectifs et fichiers ajoutés
+
+- Jenkinsfile : vérifie les changements sur server/ et client/, construit seulement l'image concernée (et les deux si Jenkinsfile change ou au premier build), génère le rapport Trivy, publie l'image sur Docker Hub et supprime les tags locaux en fin de pipeline.
+- .gitlab-ci.yml : deux jobs indépendants, déclenchés uniquement sur un push vers main si le dossier du composant correspondant ou le fichier CI change.
+- .github/workflows/docker-ci.yml : filtre les changements et crée un job matriciel pour chaque composant modifié sur main.
+- Les trois pipelines produisent un rapport Trivy complet pour le composant construit. Le contrôle bloquant HIGH/CRITICAL est désactivé par défaut pour permettre l'analyse initiale et peut être activé pour vérifier qu'une vulnérabilité empêche le push.
+
+### Configuration des secrets
+
+Ne commitez jamais de token Docker Hub.
+
+Jenkins (Manage Jenkins > Credentials) : créer dockerhub comme identifiant/mot de passe, où le mot de passe est un access token Docker Hub. L'agent Jenkins doit pouvoir exécuter Docker et accéder à son socket. La configuration Jenkins --privileged donnée par le sujet est réservée à un environnement de TP isolé.
+
+GitLab : ce dépôt étant hébergé sur GitHub, importer ou mirrorer le dépôt sur GitLab pour lancer ce pipeline. Activer un runner Docker autorisé en mode privileged pour docker:dind, puis ajouter comme variables CI/CD masquées DOCKERHUB_USER, DOCKERHUB_TOKEN, IMAGE_SERVER (par exemple votre-compte-docker/mern-server) et IMAGE_CLIENT (par exemple votre-compte-docker/mern-client). TRIVY_BLOCK_ON_HIGH_CRITICAL vaut false par défaut; la mettre à true active le blocage des pushes d'images ayant des vulnérabilités HIGH ou CRITICAL.
+
+GitHub Actions : dans Settings > Secrets and variables > Actions > Secrets, créer DOCKERHUB_USER et DOCKERHUB_TOKEN. Dans Variables, définir éventuellement TRIVY_BLOCK_ON_HIGH_CRITICAL à true pour activer le contrôle bloquant; sinon le rapport est généré sans bloquer le push. Sans les deux secrets Docker Hub, GitHub Actions construit et analyse les images mais saute les étapes de connexion et de publication.
+
+Les images sont taguées avec le numéro de build Jenkins ou le SHA court GitLab / SHA GitHub. Le client React est construit avec REACT_APP_API_URL=http://localhost:9000, une URL appelée par le navigateur de l'utilisateur.
+
+### Exécuter et vérifier le TP3
+
+Les définitions CI sont préparées, mais il faut disposer des services et secrets décrits ci-dessus pour exécuter les trois plateformes et obtenir des rapports réels. Après chaque exécution :
+
+1. Vérifier que seul le job du composant modifié s'exécute. Pour le tester, faire un commit ne touchant que server/, puis un autre ne touchant que client/.
+2. Télécharger trivy_server.txt / trivy_client.txt depuis les artefacts Jenkins ou GitLab, ou les artefacts trivy-server / trivy-client dans GitHub Actions. Relever les vulnérabilités CRITICAL, HIGH, MEDIUM et LOW réellement affichées.
+3. Corriger au moins une vulnérabilité dans le composant touché puis refaire un commit pour vérifier que seul son pipeline se relance.
+4. Pour vérifier le blocage des publications, activer temporairement BLOCK_ON_HIGH_CRITICAL dans Jenkins ou TRIVY_BLOCK_ON_HIGH_CRITICAL=true dans GitLab / GitHub Actions. Une image contenant HIGH ou CRITICAL doit arrêter le job avant le push. Désactiver ensuite le contrôle si l'on souhaite publier malgré ces résultats.
+5. Capturer les exécutions, scans, rapports et images publiées depuis les interfaces Jenkins, GitLab, GitHub Actions et Docker Hub. Les captures et nombres de vulnérabilités sont à ajouter après les exécutions réelles; ils ne sont pas inventés dans ce compte rendu.
+
+### État honnête des vérifications
+
+Les pipelines et leur documentation sont ajoutés au dépôt. L'exécution réelle, les rapports Trivy, la correction d'une vulnérabilité observée, les publications Docker Hub et les captures d'écran restent à faire avec les comptes et runners configurés. Le moteur Docker de la machine n'étant pas démarré, les images ne peuvent pas être construites localement ici. La question 8 du TP2 n'est pas comprise dans le présent TP3.
